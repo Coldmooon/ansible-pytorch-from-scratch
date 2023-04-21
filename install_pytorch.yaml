@@ -1,0 +1,19 @@
+---
+- name: install pytorch for multiple users
+  hosts: llm34
+  vars:
+    home_dir: /home/liyang
+    downloads_dir: /home/liyang/Downloads
+  tasks:
+    # Each of your commands will be executed in a different process according to https://stackoverflow.com/questions/58180085/bug-using-conda-command-via-ansible
+    - name: update anaconda
+      shell: ". /opt/anaconda3/bin/activate && proxychains4 conda update conda -y" 
+      remote_user: liyang
+    
+    - name: create anaconda envs pytorch2.0cuda118
+      shell: "proxychains4 /opt/anaconda3/bin/conda create -y -n pytorch2.0cuda118 python=3.8.13" 
+      remote_user: liyang
+    
+    - name: go to pytorch2.0cuda118 env and install pytorch
+      shell: ". /opt/anaconda3/bin/activate && conda activate pytorch2.0cuda118 && conda install -y pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia"
+      remote_user: liyang

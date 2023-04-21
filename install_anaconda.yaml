@@ -1,0 +1,127 @@
+---
+- name: install anaconda and configure anaconda for multiple users
+  hosts: llm34
+  vars:
+    home_dir: /home/liyang
+    downloads_dir: /home/liyang/Downloads
+    conda_http_proxy: 192.168.101.178:8888
+    conda_https_proxy: 192.168.101.178:8888
+  tasks:
+    - name: download anaconda
+      shell: "cd {{home_dir}} && proxychains4 wget https://repo.anaconda.com/archive/Anaconda3-2023.03-Linux-x86_64.sh"
+
+    - name: install anaconda on /opt/anaconda3/ for system-wide
+      shell: "sudo sh Anaconda3-2023.03-Linux-x86_64.sh -b -p /opt/anaconda3/"
+      become: yes
+      become_method: sudo
+
+    - name: Update /etc/bash.bashrc
+      become: yes
+      become_method: sudo
+      ansible.builtin.blockinfile:
+        path: /etc/bash.bashrc
+        block: |
+          echo
+          echo "---------------------------------------------------------------"
+          if [ -e "/opt/ros/noetic/setup.bash" ]; then
+              source /opt/ros/noetic/setup.bash
+              echo "[/etc/bash.bashrc]: ROS sourced in /etc/bash.bashrc .."
+          fi
+          echo -e "[/etc/bash.bashrc]: \e[1;32mPlease activate Anaconda Python manually: \". /opt/anaconda3/bin/activate\"\e[0m"
+          echo -e "[/etc/bash.bashrc]: \e[1;31m\"export \$PATH=/PATH/TO/anaconda3/bin\" is NOT recommended. \e[0mCheck https://www.guyuehome.com/33763"
+          echo "[/etc/bash.bashrc]: \$PATH: $PATH"
+        insertafter: EOF
+
+    - name: Update /etc/profile
+      become: yes
+      become_method: sudo
+      ansible.builtin.blockinfile:
+        path: /etc/profile
+        block: |
+          echo "[/etc/profile    ]: \$PATH: $PATH"
+        insertafter: EOF
+
+    - name: Update .bashrc file
+      ansible.builtin.blockinfile:
+        path: /home/liyang/test.txt
+        block: |
+          # The base environment is activated by default
+          # conda config --set auto_activate_base True
+          #
+          # >>> conda initialize >>>
+          # !! Contents within this block are managed by 'conda init' !!
+          __conda_setup="$('/opt/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+          if [ $? -eq 0 ]; then
+              eval "$__conda_setup"
+          else
+              if [ -f "/opt/anaconda3/etc/profile.d/conda.sh" ]; then
+                  . "/opt/anaconda3/etc/profile.d/conda.sh"
+              else
+                  export PATH="/opt/anaconda3/bin:$PATH"
+              fi
+          fi
+          unset __conda_setup
+          # <<< conda initialize <<<
+          #
+          echo "[~/.bashrc       ]: \$PATH: $PATH"
+          export PATH=/home/liyang/.local/bin:$PATH
+          echo
+        insertafter: EOF
+
+    - name: build anaconda group 
+      ansible.builtin.group:
+        name: anaconda
+        state: present
+      become: yes
+      become_method: sudo
+
+    - name: adding existing user liyang to group sudo
+      user:
+        name: liyang
+        groups: anaconda
+        append: yes
+      become: yes
+      become_method: sudo
+
+    - name: recursively update /opt/anaconda3 directory
+      become: yes
+      become_method: sudo
+      file:
+        path: /opt/anaconda3
+        group: anaconda
+        state: directory
+        recurse: yes
+        mode: g+rwx,o-rwx,g+s
+
+    - name: update /opt/anaconda3/env3 directory
+      become: yes
+      become_method: sudo
+      file:
+        path: /opt/anaconda3/envs
+        mode: g-w
+      become: yes
+      become_method: sudo
+
+    - name: set /opt/anaconda3/.condarc 0770
+      become: yes
+      become_method: sudo
+      file:
+        path: /opt/anaconda3/.condarc
+        state: "touch"
+        mode: "0770"
+
+    - name: setting .condarc
+      become: yes
+      become_method: sudo
+      blockinfile:
+        path: /opt/anaconda3/.condarc
+        block: |
+          proxy_servers:
+            http: {{conda_http_proxy}}
+            https: {{conda_https_proxy}}
+          ssl_verify: False
+          envs_dirs:
+            - /opt/anaconda3/envs
+            - $HOME/.conda/envs
+        state: present
+        insertbefore: BOF

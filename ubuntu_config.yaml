@@ -1,0 +1,27 @@
+---
+- name: install deep learning environment
+  hosts: llm34
+  become: yes
+  vars:
+    home_dir: /home/liyang
+    downloads_dir: /home/liyang/Downloads
+  tasks:
+    - name: set python link
+      shell: sudo ln -sf /usr/bin/python3 /usr/bin/python
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: copy proxychains-ng to all
+      copy:
+        src: "{{downloads_dir}}/proxychains-ng-4.16.tar.xz"
+        dest: "{{downloads_dir}}"
+
+    - name: install proxychains
+      shell: cd "{{downloads_dir}}" && tar -xvf proxychains-ng-4.16.tar.xz && cd proxychains-ng-4.16 && ./configure && make && sudo make install
+
+    - name: copy proxychains configure file to all
+      copy:
+        src: "/usr/local/etc/proxychains.conf"
+        dest: "/usr/local/etc/proxychains.conf"
